@@ -1,0 +1,37 @@
+# Copy to config.yaml and edit. Secrets stay in .env, NOT here.
+
+channel_id:                 # optional here; DISCORD_CHANNEL_ID env wins
+channel_name: stocks        # shown in the report title
+lookback_hours: 24          # how far back a live run reads
+
+# --- AI extraction ---
+gemini_model: gemini-2.5-flash   # free tier; 2.5-flash-lite for higher RPD
+anonymize_usernames: true        # replace real names with user1/user2 before
+                                 # sending to the free LLM (privacy)
+min_confidence: 0.35             # drop low-confidence LLM stances
+
+# --- Trust weighting ---
+# Give reliable members a higher weight so their views count for more.
+# Names must match the Discord display name (case-insensitive).
+default_user_weight: 1.0
+trusted_threshold: 2.0           # weight >= this => shown under "Trusted voices"
+trusted_users:
+  Rajesh: 3.0
+  Priya: 2.5
+  Vikram: 2.0
+
+# --- Ranking ---
+top_n: 10                        # how many consensus stocks to surface
+breaking_news_threshold: 0.6     # 0..1; lower = surface more "big news" items
+recency_half_life_hours: 12.0    # older mentions decay in weight
+
+# --- Market data ---
+use_market_data: true            # yfinance price/volume/news augmentation
+
+# --- Reporting ---
+report:
+  output_dir: out
+  to_file: true
+  to_email: false
+  to_telegram: false
+  to_discord: false

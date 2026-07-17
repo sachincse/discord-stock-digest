@@ -1,0 +1,44 @@
+name: daily-digest
+
+# Recommended FREE deploy: GitHub Actions runs the digest once a day and posts
+# it to Discord via a webhook — nothing to host, no always-on bot.
+# Public repos get unlimited Actions minutes; a daily job is a trivial slice.
+#
+# Setup (see docs/SETUP.md → "Deploy for free"):
+#   Repo → Settings → Secrets and variables → Actions → add:
+#     DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID, GEMINI_API_KEY, DISCORD_WEBHOOK_URL
+#
+# NOTE: cron is in UTC. 15:30 UTC = 21:00 IST. Validate at https://crontab.guru
+# NOTE: GitHub silently disables scheduled workflows after 60 days of repo
+#       inactivity — a monthly commit (or manual run) keeps it alive.
+
+on:
+  schedule:
+    - cron: "30 15 * * *"
+  workflow_dispatch: {}      # lets you trigger a manual test run from the UI
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Generate & deliver digest
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          REPORT_TO_DISCORD: "true"
+        run: python main.py --once --live-market
+      - name: Archive digest files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ github.run_id }}
+          path: out/
+          if-no-files-found: ignore

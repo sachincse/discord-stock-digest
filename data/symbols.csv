@@ -1,0 +1,80 @@
+canonical_symbol,company,exchange,aliases
+^NSEI,Nifty 50,NSE,Nifty|Nifty50|Nifty 50
+^NSEBANK,Nifty Bank,NSE,BankNifty|Bank Nifty|Nifty Bank
+^BSESN,BSE Sensex,BSE,Sensex
+RELIANCE.NS,Reliance Industries,NSE,RIL|Reliance|Reliance Ind
+TCS.NS,Tata Consultancy Services,NSE,TCS|Tata Consultancy
+INFY.NS,Infosys,NSE,Infosys|Infy
+HDFCBANK.NS,HDFC Bank,NSE,HDFC Bank|HDFCBank
+ICICIBANK.NS,ICICI Bank,NSE,ICICI|ICICI Bank
+SBIN.NS,State Bank of India,NSE,SBI|State Bank
+AXISBANK.NS,Axis Bank,NSE,Axis|Axis Bank
+KOTAKBANK.NS,Kotak Mahindra Bank,NSE,Kotak|Kotak Bank
+BHARTIARTL.NS,Bharti Airtel,NSE,Airtel|Bharti|Bharti Airtel
+ITC.NS,ITC,NSE,ITC
+LT.NS,Larsen & Toubro,NSE,L&T|Larsen|LnT
+HINDUNILVR.NS,Hindustan Unilever,NSE,HUL|Hindustan Unilever
+BAJFINANCE.NS,Bajaj Finance,NSE,Bajaj Finance|Bajaj Fin
+BAJAJFINSV.NS,Bajaj Finserv,NSE,Bajaj Finserv
+ASIANPAINT.NS,Asian Paints,NSE,Asian Paints|Asian Paint
+MARUTI.NS,Maruti Suzuki,NSE,Maruti|Maruti Suzuki
+TITAN.NS,Titan Company,NSE,Titan
+SUNPHARMA.NS,Sun Pharma,NSE,Sun Pharma|Sunpharma
+WIPRO.NS,Wipro,NSE,Wipro
+HCLTECH.NS,HCL Technologies,NSE,HCL|HCL Tech|HCLTech
+TECHM.NS,Tech Mahindra,NSE,Tech Mahindra|TechM
+ULTRACEMCO.NS,UltraTech Cement,NSE,UltraTech|Ultratech Cement
+NTPC.NS,NTPC,NSE,NTPC
+POWERGRID.NS,Power Grid,NSE,Power Grid|Powergrid
+ONGC.NS,Oil & Natural Gas Corp,NSE,ONGC
+COALINDIA.NS,Coal India,NSE,Coal India|Coalindia
+TATASTEEL.NS,Tata Steel,NSE,Tata Steel|Tatasteel
+TATAMOTORS.NS,Tata Motors,NSE,Tata Motors|Tatamotors
+JSWSTEEL.NS,JSW Steel,NSE,JSW Steel|JSW
+HINDALCO.NS,Hindalco Industries,NSE,Hindalco
+ADANIENT.NS,Adani Enterprises,NSE,Adani Ent|Adani Enterprises
+ADANIPORTS.NS,Adani Ports,NSE,Adani Ports|Adani Port
+ADANIGREEN.NS,Adani Green Energy,NSE,Adani Green
+NESTLEIND.NS,Nestle India,NSE,Nestle|Nestle India
+DMART.NS,Avenue Supermarts,NSE,DMart|Avenue Supermarts|D-Mart
+ZOMATO.NS,Eternal (Zomato),NSE,Zomato|Eternal
+PAYTM.NS,One97 Communications (Paytm),NSE,Paytm|One97
+NYKAA.NS,FSN E-Commerce (Nykaa),NSE,Nykaa
+POLICYBZR.NS,PB Fintech (PolicyBazaar),NSE,PolicyBazaar|PB Fintech
+IRCTC.NS,Indian Railway Catering (IRCTC),NSE,IRCTC
+IRFC.NS,Indian Railway Finance Corp,NSE,IRFC
+DIXON.NS,Dixon Technologies,NSE,Dixon
+TATAPOWER.NS,Tata Power,NSE,Tata Power|Tatapower
+VEDL.NS,Vedanta,NSE,Vedanta|Vedl
+YESBANK.NS,Yes Bank,NSE,Yes Bank|Yesbank
+IDEA.NS,Vodafone Idea,NSE,Vodafone Idea|Vi|Vodafone|Vod Idea
+SUZLON.NS,Suzlon Energy,NSE,Suzlon
+BEL.NS,Bharat Electronics,NSE,BEL|Bharat Electronics
+HAL.NS,Hindustan Aeronautics,NSE,HAL|Hindustan Aeronautics
+BDL.NS,Bharat Dynamics,NSE,BDL|Bharat Dynamics
+MAZDOCK.NS,Mazagon Dock Shipbuilders,NSE,Mazdock|Mazagon Dock|Mazagon
+RVNL.NS,Rail Vikas Nigam,NSE,RVNL|Rail Vikas
+PFC.NS,Power Finance Corp,NSE,PFC|Power Finance
+RECLTD.NS,REC Ltd,NSE,REC|Rec Ltd
+BSE.NS,BSE Ltd,NSE,BSE Ltd
+HDFCLIFE.NS,HDFC Life Insurance,NSE,HDFC Life
+LICI.NS,Life Insurance Corp,NSE,LIC|LICI
+DRREDDY.NS,Dr Reddy's Laboratories,NSE,Dr Reddy|Dr Reddys|DRL
+CIPLA.NS,Cipla,NSE,Cipla
+DIVISLAB.NS,Divi's Laboratories,NSE,Divis|Divis Lab
+TRENT.NS,Trent,NSE,Trent
+PERSISTENT.NS,Persistent Systems,NSE,Persistent
+LTIM.NS,LTIMindtree,NSE,LTIMindtree|LTIM|Mindtree
+COFORGE.NS,Coforge,NSE,Coforge
+KPITTECH.NS,KPIT Technologies,NSE,KPIT
+TATAELXSI.NS,Tata Elxsi,NSE,Tata Elxsi
+AAPL,Apple,US,Apple|AAPL
+MSFT,Microsoft,US,Microsoft|MSFT
+GOOGL,Alphabet,US,Google|Alphabet|GOOGL
+AMZN,Amazon,US,Amazon|AMZN
+NVDA,NVIDIA,US,Nvidia|NVDA
+META,Meta Platforms,US,Meta|Facebook|META
+TSLA,Tesla,US,Tesla|TSLA
+NFLX,Netflix,US,Netflix|NFLX
+AMD,Advanced Micro Devices,US,AMD
+PLTR,Palantir,US,Palantir|PLTR

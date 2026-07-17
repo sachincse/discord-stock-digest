@@ -1,0 +1,17 @@
+# Core pipeline runs offline (--selftest) on the stdlib alone except PyYAML.
+PyYAML>=6.0
+
+# --- Live Discord ingestion (Path A: official bot) ---
+discord.py>=2.3
+
+# --- AI extraction (Google Gemini free tier) ---
+google-genai>=0.3
+
+# --- Market data augmentation ---
+yfinance>=0.2.40
+
+# --- Reporting (Telegram optional) ---
+requests>=2.31
+
+# --- Dev / tests ---
+pytest>=7.4

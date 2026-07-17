@@ -1,0 +1,23 @@
+# Secrets & local config
+.env
+config.yaml
+
+# Generated reports (real runs)
+out/
+
+# Exported Discord data (may contain third-party PII)
+data/export_*.json
+data/*_export.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# OS
+.DS_Store
+Thumbs.db
