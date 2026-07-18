@@ -129,16 +129,18 @@ def rank(items: list[StockDigestItem], config: Config) -> list[StockDigestItem]:
 
     for item in items:
         pr = getattr(item, "_point_richness", 0)
+        mom = 1.0 if item.mention_momentum >= config.momentum_threshold else 0.0
         breadth = 1 + 0.3 * math.log1p(item.distinct_authors)
         conviction = 0.5 + 0.5 * abs(item.net_sentiment)
         substance = 1 + 0.15 * pr
-        rel = (item.weighted_score / max_w) * breadth * conviction * substance
+        trend = 1 + 0.20 * mom  # cross-day momentum lifts relevance
+        rel = (item.weighted_score / max_w) * breadth * conviction * substance * trend
         item.relevance_score = round(rel, 4)
 
         # Weight-agnostic: a concrete event (order win, results, circuit, SEBI
         # action...) alone crosses the default threshold, so real news from an
-        # unknown/low-trust user is never dropped. Market/velocity spikes stack
-        # on top.
+        # unknown/low-trust user is never dropped. Cross-day momentum, market
+        # volume and news spikes stack on top.
         has_event = 1.0 if item.event_flags else 0.0
         vol_spike = 0.0
         news_spike = 0.0
@@ -148,7 +150,8 @@ def rank(items: list[StockDigestItem], config: Config) -> list[StockDigestItem]:
             if item.market.news_count >= 5:
                 news_spike = 1.0
         burst = item.mention_count / max_m
-        bn = 0.60 * has_event + 0.20 * vol_spike + 0.15 * news_spike + 0.15 * burst
+        bn = (0.60 * has_event + 0.40 * mom + 0.18 * vol_spike
+              + 0.12 * news_spike + 0.12 * burst)
         item.breaking_news_score = round(min(bn, 1.0), 4)
 
     # Normalise relevance to 0..1 for display comparability.
@@ -164,13 +167,18 @@ def rank(items: list[StockDigestItem], config: Config) -> list[StockDigestItem]:
         in_top = id(item) in top
         is_breaking = item.breaking_news_score >= config.breaking_news_threshold
         if in_top and is_breaking:
-            item.surfaced_reason = "top consensus + breaking news"
+            reason = "top consensus + breaking news"
         elif in_top:
-            item.surfaced_reason = "top consensus"
+            reason = "top consensus"
         elif is_breaking:
-            item.surfaced_reason = "breaking news (velocity/event)"
+            reason = "breaking news (velocity/event)"
         else:
             continue
+        if item.is_new:
+            reason += " · 🆕 new today"
+        elif item.mention_momentum >= config.momentum_threshold:
+            reason += f" · 📈 trending ({item.mention_momentum:.1f}× baseline)"
+        item.surfaced_reason = reason
         surfaced.append(item)
 
     surfaced.sort(

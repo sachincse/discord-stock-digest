@@ -1,14 +1,16 @@
 """Stage 3 — extract per-stock opinions from disentangled threads.
 
-Two interchangeable extractors implement the same interface:
+Interchangeable extractors implement the same ``Extractor`` interface:
 
   * ``HeuristicExtractor`` — zero-dependency, offline, deterministic. Used by
-    ``--selftest`` and as the automatic fallback when no Gemini key is set.
+    ``--selftest`` and as the automatic fallback when no LLM is configured.
   * ``GeminiExtractor`` — Google Gemini (free tier) for real language
     understanding: nuance, conditionals, sarcasm, implicit sentiment.
+  * ``OllamaExtractor`` — a local Ollama model: same LLM quality tier, but
+    fully private and free (nothing leaves the machine).
 
-Both return ``list[StockMention]``. Every symbol is validated against the
-gazetteer, so neither extractor can emit a ticker that doesn't exist
+All return ``list[StockMention]``. Every symbol is validated against the
+gazetteer, so no extractor can emit a ticker that doesn't exist
 ("valid JSON is not correct JSON").
 """
 from __future__ import annotations
@@ -142,42 +144,45 @@ class HeuristicExtractor:
 
 
 # =========================================================================
-# Gemini (LLM) extractor
+# LLM extractors (Gemini free tier + local Ollama) — shared base
 # =========================================================================
-_SCHEMA = {
-    "type": "array",
-    "items": {
-        "type": "object",
-        "properties": {
-            "canonical_symbol": {"type": "string"},
-            "company": {"type": "string"},
-            "stances": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "author": {"type": "string"},
-                        "sentiment": {
-                            "type": "string",
-                            "enum": ["positive", "negative", "neutral"],
-                        },
-                        "recommendation": {
-                            "type": "string",
-                            "enum": ["buy", "accumulate", "hold", "avoid", "sell", "unclear"],
-                        },
-                        "case_study": {"type": "string"},
-                        "future_expectation": {"type": "string"},
-                        "problem_or_risk": {"type": "string"},
-                        "event_flags": {"type": "array", "items": {"type": "string"}},
-                        "evidence_quote": {"type": "string"},
-                        "confidence": {"type": "number"},
-                    },
-                    "required": ["author", "sentiment", "recommendation", "evidence_quote"],
-                },
-            },
+# Object-root schema (a "stocks" array). Works as Gemini's response_schema
+# AND as Ollama's `format` for constrained decoding.
+_STANCE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "author": {"type": "string"},
+        "sentiment": {"type": "string", "enum": ["positive", "negative", "neutral"]},
+        "recommendation": {
+            "type": "string",
+            "enum": ["buy", "accumulate", "hold", "avoid", "sell", "unclear"],
         },
-        "required": ["canonical_symbol", "stances"],
+        "case_study": {"type": "string"},
+        "future_expectation": {"type": "string"},
+        "problem_or_risk": {"type": "string"},
+        "event_flags": {"type": "array", "items": {"type": "string"}},
+        "evidence_quote": {"type": "string"},
+        "confidence": {"type": "number"},
     },
+    "required": ["author", "sentiment", "recommendation", "evidence_quote"],
+}
+_LLM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "stocks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "canonical_symbol": {"type": "string"},
+                    "company": {"type": "string"},
+                    "stances": {"type": "array", "items": _STANCE_SCHEMA},
+                },
+                "required": ["canonical_symbol", "stances"],
+            },
+        }
+    },
+    "required": ["stocks"],
 }
 
 _PROMPT = """You analyse a single Discord conversation from a stock-discussion \
@@ -195,27 +200,29 @@ upper/lower circuit, etc.) if mentioned.
 - Respect conditionals ("if it breaks 200 I'll buy" is not a current buy) and \
 sarcasm. Use "neutral"/"unclear" when genuinely unsure.
 - Ignore noise, greetings, and off-topic chatter.
+- Return JSON of the form {{"stocks": [...]}}.
 
 CONVERSATION:
 {conversation}
 """
 
 
-class GeminiExtractor:
-    name = "gemini"
+def _extract_rows(parsed) -> list[dict]:
+    """Accept either a bare list or a {"stocks": [...]} object."""
+    if isinstance(parsed, dict):
+        return parsed.get("stocks") or parsed.get("results") or []
+    if isinstance(parsed, list):
+        return parsed
+    return []
+
+
+class _LLMExtractor:
+    """Shared per-thread prompt/parse/validate loop for LLM backends."""
+
+    name = "llm"
 
     def __init__(self, config: Config):
         self.config = config
-        self._client = None
-
-    def _client_lazy(self):
-        if self._client is None:
-            from google import genai  # type: ignore
-
-            if not self.config.gemini_api_key:
-                raise RuntimeError("GEMINI_API_KEY not set")
-            self._client = genai.Client(api_key=self.config.gemini_api_key)
-        return self._client
 
     def extract(
         self, threads: list[Thread], gz: Gazetteer, config: Config
@@ -227,43 +234,30 @@ class GeminiExtractor:
             )
             if not candidates:
                 continue  # nothing to extract; don't spend a call
+            prompt = _PROMPT.format(
+                candidates="\n".join(f"- {c}" for c in candidates),
+                conversation=_anonymise(thread, self.config.anonymize_usernames),
+            )
             try:
-                data = self._call(thread, candidates, gz)
+                rows = self._complete(prompt)
             except Exception as exc:  # degrade gracefully, keep the digest alive
-                print(f"[gemini] thread {thread.thread_id} failed: {exc}")
+                print(f"[{self.name}] thread {thread.thread_id} failed: {exc}")
                 continue
-            mentions.extend(self._to_mentions(data, thread, gz))
+            mentions.extend(self._to_mentions(rows, thread, gz))
         return mentions
 
-    def _call(self, thread: Thread, candidates: list[str], gz: Gazetteer) -> list[dict]:
-        client = self._client_lazy()
-        conversation = _anonymise(thread, self.config.anonymize_usernames)
-        prompt = _PROMPT.format(
-            candidates="\n".join(f"- {c}" for c in candidates),
-            conversation=conversation,
-        )
-        resp = client.models.generate_content(
-            model=self.config.gemini_model,
-            contents=prompt,
-            config={
-                "response_mime_type": "application/json",
-                "response_schema": _SCHEMA,
-                "temperature": 0.1,
-            },
-        )
-        text = getattr(resp, "text", None) or "[]"
-        parsed = json.loads(text)
-        return parsed if isinstance(parsed, list) else []
+    def _complete(self, prompt: str) -> list[dict]:  # pragma: no cover - overridden
+        raise NotImplementedError
 
-    def _to_mentions(self, data: list[dict], thread: Thread, gz: Gazetteer) -> list[StockMention]:
+    def _to_mentions(self, rows: list[dict], thread: Thread, gz: Gazetteer) -> list[StockMention]:
         out: list[StockMention] = []
         by_name = {m.author_name.lower(): m for m in thread.messages}
-        for row in data:
-            symbol = row.get("canonical_symbol", "")
+        for row in rows:
+            symbol = (row or {}).get("canonical_symbol", "")
             entry = gz.get(symbol)
-            if entry is None:  # reject hallucinated tickers
+            if entry is None:  # reject hallucinated / invalid tickers
                 continue
-            for st in row.get("stances", []):
+            for st in row.get("stances", []) or []:
                 author = st.get("author", "?")
                 msg = _match_message(thread, author, st.get("evidence_quote", ""), by_name)
                 points = {
@@ -294,6 +288,63 @@ class GeminiExtractor:
                     )
                 )
         return out
+
+
+class GeminiExtractor(_LLMExtractor):
+    name = "gemini"
+
+    def __init__(self, config: Config):
+        super().__init__(config)
+        self._client = None
+
+    def _client_lazy(self):
+        if self._client is None:
+            from google import genai  # type: ignore
+
+            if not self.config.gemini_api_key:
+                raise RuntimeError("GEMINI_API_KEY not set")
+            self._client = genai.Client(api_key=self.config.gemini_api_key)
+        return self._client
+
+    def _complete(self, prompt: str) -> list[dict]:
+        client = self._client_lazy()
+        resp = client.models.generate_content(
+            model=self.config.gemini_model,
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": _LLM_SCHEMA,
+                "temperature": 0.1,
+            },
+        )
+        return _extract_rows(json.loads(getattr(resp, "text", None) or "{}"))
+
+
+class OllamaExtractor(_LLMExtractor):
+    """Local, free, fully-private extraction via an Ollama server.
+
+    No cloud, no quota, nothing leaves the machine — the privacy-preserving
+    option. Requires a running Ollama (https://ollama.com) with the configured
+    model pulled (e.g. ``ollama pull qwen2.5:3b``).
+    """
+
+    name = "ollama"
+
+    def _complete(self, prompt: str) -> list[dict]:
+        import requests
+
+        url = f"{self.config.ollama_host.rstrip('/')}/api/chat"
+        payload = {
+            "model": self.config.ollama_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+            "format": _LLM_SCHEMA,  # constrained decoding -> valid JSON
+            "options": {"temperature": 0.1},
+        }
+        resp = requests.post(url, json=payload, timeout=self.config.ollama_timeout)
+        resp.raise_for_status()
+        content = resp.json().get("message", {}).get("content", "{}")
+        return _extract_rows(json.loads(content))
 
 
 def _anonymise(thread: Thread, on: bool) -> str:
@@ -331,11 +382,29 @@ def _match_message(thread: Thread, author: str, quote: str, by_name: dict):
 
 
 def select_extractor(config: Config) -> Extractor:
-    """Pick Gemini when a key is present, else the offline heuristic."""
+    """Choose an extractor from ``config.extractor_backend``.
+
+    - ``heuristic`` — offline rules (default fallback)
+    - ``gemini``    — Google Gemini free tier (needs GEMINI_API_KEY)
+    - ``ollama``    — local Ollama server (fully private, free)
+    - ``auto``      — Gemini if a key is present, else heuristic
+    """
+    backend = (config.extractor_backend or "auto").lower()
+    if backend == "heuristic":
+        return HeuristicExtractor()
+    if backend == "ollama":
+        return OllamaExtractor(config)
+    if backend == "gemini":
+        try:
+            import google.genai  # noqa: F401
+            return GeminiExtractor(config)
+        except Exception:
+            print("[extract] google-genai not installed; using heuristic extractor")
+            return HeuristicExtractor()
+    # auto
     if config.gemini_api_key:
         try:
-            import google.genai  # noqa: F401  (availability check)
-
+            import google.genai  # noqa: F401
             return GeminiExtractor(config)
         except Exception:
             print("[extract] google-genai not installed; using heuristic extractor")

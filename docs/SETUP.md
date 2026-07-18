@@ -8,12 +8,13 @@ shows the expected result so you can check yourself.
 2. [30-second offline test (no keys)](#2-30-second-offline-test-no-keys)
 3. [Create the Discord bot](#3-create-the-discord-bot)
 4. [Get it added to the server](#4-get-it-added-to-the-server)
-5. [Get a free Gemini key](#5-get-a-free-gemini-key)
+5. [Choose an AI backend](#5-choose-an-ai-backend)
 6. [Configure `.env` and `config.yaml`](#6-configure-env-and-configyaml)
 7. [Run it](#7-run-it)
 8. [Deploy for free (runs daily by itself)](#8-deploy-for-free-runs-daily-by-itself)
 9. [Troubleshooting](#9-troubleshooting)
 10. [Cost & privacy](#10-cost--privacy)
+11. [Persistence & history (SQLite)](#11-persistence--history-sqlite)
 
 ---
 
@@ -101,16 +102,40 @@ ON** → right-click the channel → **Copy Channel ID**. That's your
 
 ---
 
-## 5. Get a free Gemini key
+## 5. Choose an AI backend
 
-1. Go to <https://aistudio.google.com/apikey> → **Create API key**.
-2. Copy it — that's your `GEMINI_API_KEY`.
-3. **Keep billing disabled** on the project to stay on the free tier (Gemini
-   2.5 Flash / Flash-Lite: 1M context, ~1,000 requests/day — a daily digest is
-   one request).
+Pick with `--backend` (or `extractor_backend:` in `config.yaml`):
 
-> Skipping Gemini? The tool automatically falls back to the offline heuristic
-> extractor. Lower quality, but zero keys and zero cost.
+| Backend | Quality | Cost | Privacy | Setup |
+|---|---|---|---|---|
+| `heuristic` | basic | free | 100% local | nothing — the default fallback |
+| `gemini` | best | free tier | sent to Google | a free API key (below) |
+| `ollama` | great | free | 100% local | install Ollama + pull a model (below) |
+
+**Option A — Gemini (cloud, free tier):**
+1. Go to <https://aistudio.google.com/apikey> → **Create API key** → copy to
+   `.env` as `GEMINI_API_KEY`.
+2. **Keep billing disabled** to stay on the free tier (Gemini 2.5 Flash /
+   Flash-Lite: 1M context, ~1,000 req/day — a daily digest is one request).
+3. Run with `--backend gemini`.
+
+> 🔐 On the free tier Google may use inputs to improve its products. This tool
+> anonymises usernames first (`anonymize_usernames: true`); use the cheap paid
+> tier for fully private handling.
+
+**Option B — Ollama (local, free, fully private):**
+```bash
+# 1. Install from https://ollama.com  (Windows/macOS/Linux)
+# 2. Pull a small, fast model (3B is plenty; 7b/8b are more accurate)
+ollama pull qwen2.5:3b
+# 3. Ollama serves on http://localhost:11434 automatically. Then:
+python main.py --from-json data/sample_messages.json --backend ollama
+```
+Set `ollama_model` in `config.yaml` to any model you've pulled. Nothing leaves
+your machine — no key, no quota, no cost.
+
+**Option C — none:** skip the above; the offline `heuristic` extractor runs with
+zero keys (lower quality sentiment).
 
 ---
 
@@ -241,3 +266,31 @@ limitation.
   cheap **paid** tier, which is not used for training.
 - **Disclaimer:** the digest summarises **community chatter, not investment
   advice**, and sentiment can be wrong. Every report carries this notice.
+
+---
+
+## 11. Persistence & history (SQLite)
+
+Every run stores raw messages, extracted mentions, and per-day rollups in a
+local SQLite file (`data/digest.db` by default). This gives you:
+
+- **Idempotent ingestion** — messages upsert by id, so re-runs never
+  double-count and a crashed run can resume.
+- **Cross-day trends** — each day is compared to the stock's own trailing
+  baseline, so the report tags **🆕 new today** and **📈 trending (N× baseline)**.
+- **History** — inspect any stock day-by-day:
+  ```bash
+  python main.py --history RELIANCE.NS
+  ```
+  ```
+    date          mentions   sentiment   relevance
+    2026-07-15           5        1.00        1.00
+    2026-07-16           4        0.80        0.72
+    2026-07-17           9        0.90        1.00
+  ```
+
+Flags: `--db PATH` to point at a different file, `--no-db` to disable
+persistence, `--date YYYY-MM-DD` to backfill a specific day (e.g. from several
+exported JSON files). The DB is gitignored — it may contain third-party message
+content, so keep it local.
+

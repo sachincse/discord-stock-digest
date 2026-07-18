@@ -64,9 +64,15 @@ Everything else in this project is clean and free.
 - 📰 **Never misses big news** — a *dual-track* ranker surfaces top consensus
   **and** weight-agnostic breaking news (so an order win posted by an unknown
   user still shows up).
+- 🤖 **Choose your AI** — offline heuristic, Google **Gemini** (free tier), or a
+  local **Ollama** model (fully private, nothing leaves your machine). Same
+  interface; switch with `--backend`.
+- 🗄️ **SQLite memory & cross-day trends** — persists messages + daily rollups,
+  then flags **🆕 new today** and **📈 trending vs its own baseline** so you see
+  momentum, not just a snapshot.
 - 📤 **Delivers anywhere** — Markdown + self-contained HTML, to a file, email,
   Telegram, or back into Discord via webhook.
-- 🧪 **Runs offline** — `--selftest` needs no keys; 18 unit tests included.
+- 🧪 **Runs offline** — `--selftest` needs no keys; 29 unit tests included.
 
 ---
 
@@ -76,17 +82,22 @@ Everything else in this project is clean and free.
 flowchart TD
     A[Discord channel] -->|official bot API| B[RawMessage list]
     A2[Exported JSON / fixtures] --> B
+    B --> S[(SQLite<br/>messages + daily trends)]
     B --> C[Noise filter<br/>drop junk, keep tickers/events]
     C --> D[Disentangle<br/>replies + threads + mentions]
-    D --> E{Extractor}
-    E -->|GEMINI_API_KEY set| F[Gemini LLM<br/>nuanced sentiment + points]
-    E -->|offline / no key| G[Heuristic<br/>keyword rules]
+    D --> E{Extractor --backend}
+    E -->|gemini| F[Gemini LLM free tier]
+    E -->|ollama| O[Ollama local LLM<br/>private, free]
+    E -->|heuristic| G[Offline keyword rules]
     F --> H[Validate vs gazetteer]
+    O --> H
     G --> H
     H --> I[yfinance market data<br/>hype / performance flags]
     I --> J[Aggregate per stock<br/>trust + recency weighting]
-    J --> K[Dual-track rank<br/>consensus ∪ breaking-news]
+    S -. baseline .-> J
+    J --> K[Dual-track rank<br/>consensus ∪ breaking ∪ trending]
     K --> L[Report: Markdown + HTML]
+    K --> S
     L --> M[File / Email / Telegram / Discord]
 ```
 
@@ -116,19 +127,23 @@ setup, a config table, deployment, and troubleshooting) is in
 
 1. **Create the bot** → enable **Message Content Intent** → have a server admin
    add it (see [docs/owner_message.md](docs/owner_message.md)).
-2. **Get a free Gemini key** at <https://aistudio.google.com/apikey> (keep
-   billing disabled for the free tier). No key? It auto-falls back to the
-   offline heuristic extractor.
+2. **Pick an AI backend** (`--backend` or `extractor_backend` in config):
+   - `gemini` — free key at <https://aistudio.google.com/apikey> (keep billing
+     disabled for the free tier)
+   - `ollama` — fully private/local: install [Ollama](https://ollama.com), then
+     `ollama pull qwen2.5:3b` (nothing leaves your machine)
+   - `heuristic` — zero keys, offline (the default fallback)
 3. **Configure:**
    ```bash
    cp .env.example .env                 # DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID, GEMINI_API_KEY
-   cp config.example.yaml config.yaml   # trusted_users, top_n, delivery channels
+   cp config.example.yaml config.yaml   # trusted_users, top_n, delivery, backend
    ```
 4. **Run:**
    ```bash
-   python main.py --once --live-market            # one live run, real market data
-   python main.py --from-json data/export.json    # analyse an exported file
-   python main.py --schedule --at 21:30           # run daily at 21:30 local
+   python main.py --once --live-market --backend gemini   # live, Gemini
+   python main.py --from-json data/export.json --backend ollama   # local LLM
+   python main.py --history RELIANCE.NS                    # stored day-by-day trend
+   python main.py --schedule --at 21:30                    # run daily at 21:30 local
    ```
 
 > 🔐 On Gemini's free tier Google may use inputs to improve its products. This
@@ -152,12 +167,14 @@ Every surfaced stock shows **why** it made the cut. Two independent tracks:
   discussed it, how strong the net sentiment is, and how substantive the points
   were. This answers *"what's worth my attention"*.
 - **Track B — breaking news (weight-agnostic):** a concrete event (results,
-  order win, circuit, SEBI/RBI action) crosses the threshold **on its own**, and
-  volume/news spikes stack on top. This answers *"what must I not miss"* — even
-  if only one low-trust user posted it.
+  order win, circuit, SEBI/RBI action) crosses the threshold **on its own**;
+  **cross-day momentum** (today's mentions vs the stock's 7-day baseline, from
+  SQLite), volume and news spikes stack on top. This answers *"what must I not
+  miss"* — even if only one low-trust user posted it.
 
-Surfaced set = `top-N(Track A) ∪ {Track B over threshold}`. Trust weights are
-applied in code, never fed to the LLM. Tune it all in `config.yaml`.
+Surfaced set = `top-N(Track A) ∪ {Track B over threshold}`, each tagged with a
+**🆕 new today** / **📈 trending** badge from the stored history. Trust weights
+are applied in code, never fed to the LLM. Tune it all in `config.yaml`.
 
 ---
 
@@ -207,9 +224,11 @@ extractor, a dedicated hype score, cost guardrails). PRs welcome.
 | Need | Free option | Notes |
 |---|---|---|
 | Read channel | Discord bot API | owner must add the bot; Message Content Intent free < 10k users |
-| Language/AI | Gemini free tier | 2.5 Flash/Flash-Lite, 1M ctx; anonymise or go paid for privacy |
+| Language/AI (cloud) | Gemini free tier | 2.5 Flash/Flash-Lite, 1M ctx; anonymise or go paid for privacy |
+| Language/AI (local) | **Ollama** | fully private & free; `ollama pull qwen2.5:3b`, `--backend ollama` |
 | Market data | `yfinance` | US **and** Indian (`.NS`/`.BO`); batch calls to dodge 429s |
-| Fallback LLM | Groq / OpenRouter | swap via the `Extractor` protocol |
+| Storage/trends | SQLite (stdlib) | messages + daily rollups; powers momentum & `--history` |
+| Other LLMs | Groq / OpenRouter | swap via the `Extractor` protocol |
 
 ---
 

@@ -31,21 +31,25 @@ disclaimers — all already implemented) and surfaced the improvements below.
 - ✅ Trust + recency weighting; provenance metadata; yfinance price/volume/news
 - ✅ Multi-channel delivery (file/email/Telegram/Discord); free GitHub Actions deploy
 - ✅ Username anonymisation for the free LLM tier; "not advice" disclaimer
+- ✅ **SQLite persistence** — raw messages (idempotent upsert), mentions, daily
+  rollups; `--history SYMBOL`; survives restarts
+- ✅ **Cross-day trends** — trailing baseline → `is_new` ("🆕 new today") and
+  mention-momentum ("📈 trending N× baseline"), feeding the breaking-news track
+- ✅ **Local Ollama extractor** — fully private, free LLM backend (`--backend ollama`)
 
 ## Planned
 
 | Idea | Why | Effort |
 |---|---|---|
-| **SQLite persistence + cross-day trends** | Persist per-symbol daily counts → "new tickers today", "rising vs 7-day avg", true mention-velocity/momentum for Track-B (the real "hyped" signal). Also enables dedup and backfills. | medium |
 | **Map-reduce for very busy days** | Chunk → extract per chunk → merge, so a firehose day never silently truncates past the context budget. | medium |
 | **Cost/rate-limit guardrails** | Per-run token logging, a daily $/token ceiling, `tenacity` retry+jitter on 429s. | medium |
-| **Transformer extractor** (FinTwitBERT / roberta-StockTwits) | Offline, quota-free, social-media-tuned sentiment — a middle tier between heuristic and Gemini. Slots into the `Extractor` protocol. | medium |
+| **Transformer extractor** (FinTwitBERT / roberta-StockTwits) | Offline, quota-free, social-media-tuned sentiment — a middle tier between heuristic and the LLM backends. Slots into the `Extractor` protocol. | medium |
 | **VADER + Loughran-McDonald lexicon** | Upgrade offline sentiment with finance-correct polarity + intensifiers. | medium |
 | **Auto-build full symbol universe** | `scripts/build_symbols.py` already fetches NSE; extend to BSE + richer aliases and cache. | low |
 | **Dedicated hype score** | Rocket/moon emoji, ALL-CAPS ratio, "to the moon/multibagger" slang → Track-B only, kept separate from investment sentiment. | medium |
 | **Hinglish routing** | Route code-mixed Indian chat to the LLM path; never trust English-tuned FinBERT/VADER on it. | low |
 | **Crypto-collision guard** | Require stronger context for symbols that are also crypto tickers. | low |
 | **Labeled eval set** | Use StockTwits self-labelled Bullish/Bearish tags as a regression benchmark to tune weights by measurement, not guesswork. | medium |
-| **Local Ollama fallback** | Zero-cost, fully private extraction mode. | high |
+| **Charts in the report** | Sparklines of mention/sentiment history now that daily rollups are stored. | medium |
 
 Contributions welcome — pick any row and open a PR.

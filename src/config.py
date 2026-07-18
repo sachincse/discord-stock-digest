@@ -60,10 +60,20 @@ class Config:
     lookback_hours: int = 24
 
     # --- AI extraction ---
+    extractor_backend: str = "auto"  # auto | heuristic | gemini | ollama
     gemini_api_key: Optional[str] = None
     gemini_model: str = "gemini-2.5-flash"
+    ollama_host: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:3b"
+    ollama_timeout: int = 180
     anonymize_usernames: bool = True  # privacy: don't send real names to free LLM
     min_confidence: float = 0.35
+
+    # --- persistence & cross-day trends ---
+    db_path: str = "data/digest.db"
+    use_db: bool = True
+    momentum_baseline_days: int = 7  # trailing window for "hot vs baseline"
+    momentum_threshold: float = 2.0  # today's mentions >= N× baseline => momentum
 
     # --- trust & ranking ---
     trusted_users: dict[str, float] = field(default_factory=dict)
@@ -110,10 +120,18 @@ class Config:
             channel_id=_env("DISCORD_CHANNEL_ID") or _str(data.get("channel_id")),
             channel_name=data.get("channel_name", "stocks"),
             lookback_hours=int(data.get("lookback_hours", 24)),
+            extractor_backend=_env("EXTRACTOR_BACKEND") or data.get("extractor_backend", "auto"),
             gemini_api_key=_env("GEMINI_API_KEY", "GOOGLE_API_KEY"),
             gemini_model=data.get("gemini_model", "gemini-2.5-flash"),
+            ollama_host=_env("OLLAMA_HOST") or data.get("ollama_host", "http://localhost:11434"),
+            ollama_model=_env("OLLAMA_MODEL") or data.get("ollama_model", "qwen2.5:3b"),
+            ollama_timeout=int(data.get("ollama_timeout", 180)),
             anonymize_usernames=data.get("anonymize_usernames", True),
             min_confidence=float(data.get("min_confidence", 0.35)),
+            db_path=_env("DIGEST_DB") or data.get("db_path", "data/digest.db"),
+            use_db=_envbool("USE_DB", data.get("use_db", True)),
+            momentum_baseline_days=int(data.get("momentum_baseline_days", 7)),
+            momentum_threshold=float(data.get("momentum_threshold", 2.0)),
             trusted_users={str(k): float(v) for k, v in (data.get("trusted_users", {}) or {}).items()},
             default_user_weight=float(data.get("default_user_weight", 1.0)),
             trusted_threshold=float(data.get("trusted_threshold", 2.0)),

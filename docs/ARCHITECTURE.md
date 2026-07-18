@@ -25,20 +25,22 @@ kept messages                    ← drop bots/greetings/emoji, KEEP anything
    ▼  disentangle.build_threads
 Thread[]                         ← reply edges + threads + @mentions +
    │                               shared-ticker/time heuristics (Union-Find)
-   ▼  extract.Extractor
-StockMention[]                   ← Heuristic (offline) OR Gemini (LLM);
-   │                               every symbol validated vs the gazetteer
+   ▼  extract.Extractor           ← Heuristic (offline) / Gemini / Ollama;
+StockMention[]                     every symbol validated vs the gazetteer
+   │
    ▼  market.MarketProvider
 + MarketSnapshot                 ← yfinance batch (or stub); hype/perf flags
    │
    ▼  aggregate.build_items
 StockDigestItem[]                ← group per stock; trust + recency weighting
    │
-   ▼  aggregate.rank  (dual-track)
-ranked & surfaced items          ← Track A relevance ∪ Track B breaking-news
+   ▼  store.enrich_trends         ← SQLite trailing baseline → is_new, momentum
    │
-   ▼  report.deliver
-Markdown + HTML → file/email/telegram/discord
+   ▼  aggregate.rank  (dual-track)
+ranked & surfaced items          ← Track A relevance ∪ Track B breaking/trending
+   │
+   ▼  report.deliver  (+ store.save_digest)
+Markdown + HTML → file/email/telegram/discord   ·   history → SQLite
 ```
 
 ## Key modules
@@ -52,11 +54,12 @@ Markdown + HTML → file/email/telegram/discord
 | `discord_bot.py` | Live, ToS-compliant ingestion via the official bot API |
 | `noise_filter.py` | Stage 1 — cheap deterministic junk removal |
 | `disentangle.py` | Stage 2 — conversation threading (Union-Find over signals) |
-| `extract.py` | Stage 3 — `HeuristicExtractor` + `GeminiExtractor` |
+| `extract.py` | Stage 3 — `HeuristicExtractor` + `GeminiExtractor` + `OllamaExtractor` (shared `_LLMExtractor` base) |
 | `market.py` | Stage 4 — `YFinanceProvider` + `StubMarketProvider` |
 | `aggregate.py` | Stage 5+6 — per-stock aggregation + dual-track ranking |
+| `store.py` | SQLite persistence: raw messages, mentions, daily rollups; cross-day trend enrichment |
 | `report.py` | Stage 7 — Markdown/HTML render + delivery |
-| `pipeline.py` | Wires the stages; pure and unit-testable |
+| `pipeline.py` | Wires the stages (incl. store); pure and unit-testable |
 
 ## Why these choices
 
@@ -82,6 +85,20 @@ The surfaced set is `top-N(A) ∪ {items over B threshold}`.
 **Trust weighting lives in code, not the prompt.** Author weights are applied
 during aggregation, never fed to the LLM — this keeps extraction unbiased and
 weighting auditable.
+
+**Persistence enables trends, not just a snapshot.** `store.py` writes every
+day's rollup to SQLite. Before ranking, `enrich_trends` reads each stock's
+trailing baseline (the window *before* today, so a stock is never its own
+baseline) to compute `is_new` and mention-momentum, which feed the breaking-news
+track. Research consistently finds mention *velocity* predicts moves better than
+sentiment level — momentum is the real "hyped" signal. The store is optional
+(`use_db: false`) and pure stdlib.
+
+**Three extractors, one interface.** `HeuristicExtractor` (offline rules),
+`GeminiExtractor` (cloud free tier) and `OllamaExtractor` (local, private) all
+satisfy the `Extractor` protocol. The two LLM backends share a `_LLMExtractor`
+base (per-thread prompt → constrained-JSON → gazetteer-validate → map to source
+message); only the completion call differs. Pick with `--backend`.
 
 **Privacy by default.** On the free Gemini tier Google may train on inputs, so
 `anonymize_usernames` replaces real names with `user1/user2…` before any text

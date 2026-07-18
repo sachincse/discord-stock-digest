@@ -149,6 +149,11 @@ class StockDigestItem:
     breaking_news_score: float = 0.0
     surfaced_reason: str = ""
 
+    # cross-day trend (filled from the SQLite store when enabled)
+    is_new: bool = False              # not seen in the trailing baseline window
+    baseline_mentions: float = 0.0    # trailing-average daily mentions
+    mention_momentum: float = 0.0     # today's mentions ÷ baseline (0 = no data)
+
     @property
     def sentiment_label(self) -> str:
         if self.net_sentiment > 0.25:

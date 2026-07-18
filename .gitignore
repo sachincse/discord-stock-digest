@@ -5,6 +5,11 @@ config.yaml
 # Generated reports (real runs)
 out/
 
+# SQLite databases (may contain third-party message content)
+*.db
+*.db-journal
+*.sqlite
+
 # Exported Discord data (may contain third-party PII)
 data/export_*.json
 data/*_export.json

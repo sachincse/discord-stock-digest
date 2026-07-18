@@ -5,10 +5,25 @@ channel_name: stocks        # shown in the report title
 lookback_hours: 24          # how far back a live run reads
 
 # --- AI extraction ---
+# Which extractor to use:
+#   auto      -> Gemini if GEMINI_API_KEY is set, else heuristic (default)
+#   heuristic -> offline rules, zero deps/keys (fast, lower quality)
+#   gemini    -> Google Gemini free tier (needs GEMINI_API_KEY)
+#   ollama    -> local Ollama model (fully private, free; needs Ollama running)
+extractor_backend: auto
 gemini_model: gemini-2.5-flash   # free tier; 2.5-flash-lite for higher RPD
+ollama_host: http://localhost:11434
+ollama_model: qwen2.5:3b         # any pulled model; 3b is fast, 7b/8b better
+ollama_timeout: 180
 anonymize_usernames: true        # replace real names with user1/user2 before
-                                 # sending to the free LLM (privacy)
+                                 # sending to any LLM (privacy)
 min_confidence: 0.35             # drop low-confidence LLM stances
+
+# --- Persistence & cross-day trends (SQLite) ---
+use_db: true
+db_path: data/digest.db          # stores raw messages, mentions, daily rollups
+momentum_baseline_days: 7        # trailing window for "hot vs its own baseline"
+momentum_threshold: 2.0          # today's mentions >= N× baseline => 📈 trending
 
 # --- Trust weighting ---
 # Give reliable members a higher weight so their views count for more.
