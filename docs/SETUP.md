@@ -216,6 +216,10 @@ free, and the schedule is one line. The workflow is already in
    digest posted to your Discord channel. Each run also uploads the report files
    as a downloadable artifact.
 
+> ✅ **Before you add the secrets**, the scheduled run **safely no-ops** — it
+> logs a notice and finishes green, so it never emails you failures. The day
+> after you add the four secrets it starts producing real digests automatically.
+
 > ⚠️ **Gotchas:** GitHub silently **disables scheduled workflows after 60 days**
 > of repo inactivity (a monthly commit or manual run keeps it alive), and cron
 > runs can be **delayed 5–30 min** at peak — fine for a daily digest.
