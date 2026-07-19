@@ -99,6 +99,27 @@ def cmd_selftest(config: Config) -> int:
     return 0
 
 
+def cmd_from_text(config: Config, path: str, args) -> int:
+    print("[from-text] parsing manually-copied chat (no bot/admin needed).")
+    print("            Tip: prefix lines with [Name] or 'Name:' for per-user trust weighting.")
+    messages = ingest.load_messages_from_text(path)
+    print(f"[from-text] parsed {len(messages)} messages")
+    gz = Gazetteer.load(ROOT / "data" / "symbols.csv")
+    provider = select_provider(config.use_market_data, args.live_market)
+    store = _make_store(config, args)
+    try:
+        digest = pipeline.run(
+            messages, config, gazetteer=gz, market_provider=provider,
+            store=store, report_date=_report_date(args),
+        )
+    finally:
+        if store:
+            store.close()
+    paths = report.deliver(digest, config)
+    _print_summary(digest, paths)
+    return 0
+
+
 def cmd_from_json(config: Config, path: str, args) -> int:
     messages = ingest.load_messages_from_json(path)
     gz = Gazetteer.load(ROOT / "data" / "symbols.csv")
@@ -184,6 +205,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Daily stock-chat digest from a Discord channel")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--selftest", action="store_true", help="offline demo with bundled data")
+    g.add_argument("--from-text", metavar="PATH", help="analyse manually copied chat text (no admin/bot needed)")
     g.add_argument("--from-json", metavar="PATH", help="analyse an exported JSON file")
     g.add_argument("--once", action="store_true", help="one live run against Discord")
     g.add_argument("--schedule", action="store_true", help="run daily (see --at)")
@@ -208,6 +230,8 @@ def main(argv=None) -> int:
     if args.backend:
         config.extractor_backend = args.backend
 
+    if args.from_text:
+        return cmd_from_text(config, args.from_text, args)
     if args.from_json:
         return cmd_from_json(config, args.from_json, args)
     if args.once:

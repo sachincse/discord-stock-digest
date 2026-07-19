@@ -8,7 +8,8 @@ Supported sources:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +60,69 @@ def _from_simple(rows: list[dict]) -> list[RawMessage]:
                 mentions=[str(m) for m in r.get("mentions", [])],
                 is_bot=bool(r.get("is_bot", False)),
                 reactions=int(r.get("reactions", 0)),
+            )
+        )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Manual paste ingestion  (the permission-free, ToS-clean path)
+# ---------------------------------------------------------------------------
+# For a member who can't have a bot added: read the channel yourself and copy
+# the day's messages into a text file. This just PARSES that text — no
+# automation, no token, no scraping. Two optional per-line author formats give
+# proper trust-weighting; plain text still yields stock mentions + sentiment.
+_TS_ONLY = re.compile(
+    r"^\[?\s*(today|yesterday)\b.*$|^\[?\s*\d{1,2}[:/]\d{1,2}([:/ ].*)?$"
+    r"|^\d{1,2}/\d{1,2}/\d{2,4}.*$",
+    re.I,
+)
+_BRACKET = re.compile(r"^\[([^\]]{1,32})\]\s*(.*\S)?\s*$")
+_COLON = re.compile(r"^([A-Za-z][\w.\- ]{0,23}):\s+(.+)$")
+
+
+def _looks_like_name(s: str) -> bool:
+    # Real usernames carry a lowercase letter; all-caps "RIL:" is a ticker line,
+    # not an author, so it stays as content.
+    return any(c.islower() for c in s) and len(s.split()) <= 4
+
+
+def load_messages_from_text(path: str | Path, now: datetime | None = None) -> list[RawMessage]:
+    now = now or datetime.now(timezone.utc)
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+
+    parsed: list[tuple[str, str]] = []  # (author, content)
+    current_author: str | None = None
+    for line in lines:
+        s = line.strip()
+        if not s or _TS_ONLY.match(s):
+            continue
+        m = _BRACKET.match(s)
+        if m:
+            current_author = m.group(1).strip()
+            content = (m.group(2) or "").strip()
+            if not content:  # "[Rajesh]" header on its own line
+                continue
+            parsed.append((current_author, content))
+            continue
+        m = _COLON.match(s)
+        if m and _looks_like_name(m.group(1).strip()):
+            current_author = m.group(1).strip()
+            parsed.append((current_author, m.group(2).strip()))
+            continue
+        parsed.append((current_author or "member", s))
+
+    n = len(parsed)
+    out: list[RawMessage] = []
+    for i, (author, content) in enumerate(parsed):
+        out.append(
+            RawMessage(
+                id=str(i + 1),
+                author_id=author.lower(),
+                author_name=author,
+                # spread over the recent past so ordering + recency behave
+                timestamp=now - timedelta(seconds=(n - i) * 30),
+                content=content,
             )
         )
     return out

@@ -39,7 +39,11 @@ step-by-step + a copy-paste message is in **[docs/owner_message.md](docs/owner_m
 **🚫 Do NOT use a "self-bot" or export with your personal account token.** That
 automates a user account, which is an explicit Discord ToS violation and risks
 **permanent account termination** (enforcement increased through 2025–2026).
-If the owner won't add a bot, the feature simply isn't available on that server.
+
+**🙋 No admin rights, and can't ask a mod?** You can still use it the clean way:
+read the channel yourself and paste the day's messages into the tool with
+`--from-text` (~2 min/day, fully within Discord's rules — it's just copying what
+you can already see). See **[docs/no_admin_ingestion.md](docs/no_admin_ingestion.md)**.
 
 Everything else in this project is clean and free.
 
@@ -140,7 +144,8 @@ setup, a config table, deployment, and troubleshooting) is in
    ```
 4. **Run:**
    ```bash
-   python main.py --once --live-market --backend gemini   # live, Gemini
+   python main.py --from-text today.txt --live-market     # no bot: paste-in chat
+   python main.py --once --live-market --backend gemini   # live bot, Gemini
    python main.py --from-json data/export.json --backend ollama   # local LLM
    python main.py --history RELIANCE.NS                    # stored day-by-day trend
    python main.py --schedule --at 21:30                    # run daily at 21:30 local
